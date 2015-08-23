@@ -1,0 +1,824 @@
+{\rtf1\ansi\ansicpg936\deff0\deflang1033\deflangfe2052{\fonttbl{\f0\fnil\fcharset0 Calibri;}{\f1\fnil\fcharset134 SimSun;}}
+{\colortbl ;\red0\green0\blue255;}
+{\*\generator Msftedit 5.41.21.2510;}\viewkind4\uc1\pard\sa200\sl276\slmult1\lang9\f0\fs22 The Tiny Shell Language\par
+The command syntax for the shell interface is based on the Tiny Shell Language (TSL) . It is simple enough to allow a lightweight implementation, yet provides features such as pipes, closures, variable setting and referencing, collection types such as lists and maps, and so on.\par
+\par
+The TSL syntax allows the creation of scripts that can be executed by the shell runtime service. The introduction you will get here does not cover the complete syntax; instead, you will see the basic parts of it.\par
+\par
+For a review of the proposal in its initial state, ({\field{\*\fldinst{HYPERLINK "http://www.osgi.org/download/osgi-4.2-early-draft.pdf"}}{\fldrslt{\ul\cf1 http://www.osgi.org/download/osgi-4.2-early-draft.pdf}}}\f0\fs22 ). You may also refer to the RFC 147 Overview on the Felix documentation pages ({\field{\*\fldinst{HYPERLINK "http://felix.apache.org/site/rfc-147-overview.html"}}{\fldrslt{\ul\cf1 http://felix.apache.org/site/rfc-147-overview.html}}}\f0\fs22 ) for potential differences with the initial draft .\par
+\par
+Chained execution\par
+\par
+A program is a set of chained execution blocks. Blocks are executed in parallel, and the output of a block is streamed as input to the next. Blocks are separated by the pipe character ( | ). Each block is made up of a sequence of statements, separated by a semicolon ( ; ).\par
+\par
+For example, as we'll see in the next section, the bundles command lists the currently installed bundles and the grep command takes a parameter that it uses to filter the input. The program below:\par
+\par
+bundles | grep gogo\par
+\par
+is made of two statement blocks, namely, bundles and grep gogo. The output of the bundles statement will be connected to the input of the grep gogo statement (here each the statement block contains one statement).\par
+\par
+Running this program on your Felix installation, in the state it is now, will produce:\par
+\par
+g! bundles | grep gogo\par
+   2|Active | 1|org.apache.felix.gogo.command (0.6.0)\par
+   3|Active | 1|org.apache.felix.gogo.runtime (0.6.0)\par
+   4|Active | 1|org.apache.felix.gogo.shell (0.6.0)\par
+true\par
+\par
+The grep statement has filtered the output of the bundles statement for lines containing the filter string gogo. In this case, the grep statement outputs the results of its execution to the shell which prints it.\par
+\par
+Executing the statement grep gogo on its own, without a piped block that feeds it input, will connect its input to the user command line. In that case, use Ctrl-Z to terminate your input:\par
+\par
+g! grep gogo\par
+line 1\par
+line 2 gogo\par
+line 2 gogo\par
+line 3\par
+^Z\par
+true\par
+\par
+Notice that line 2 gogo is repeated right after you have entered it, showing that the grep statement is running in parallel. It receives the input and processes it right after you enter it.\par
+\par
+Variable assignment and referencing\par
+\par
+A session variable is assigned a value using the equal character ( = ) and referenced using its name preceded with a dollar character ( $ ). For example:\par
+\par
+g! var1 = 'this is a string'\par
+this is a string\par
+g! echo $var1\par
+this is a string\par
+\par
+The assignment operation returns the assigned value.\par
+\par
+Value types\par
+\par
+We've seen the string type previously, which is indicated by surrounding text with single quotes ( ' ).\par
+\par
+A list is a sequence of terms separated by whitespace characters and is delimited by an opening and a closing square bracket.\par
+\par
+For example:\par
+\par
+g! days = [ mon tue wed thu fri sat sun ]\par
+mon\par
+tue\par
+wed\par
+thu\par
+fri\par
+sat\par
+sun\par
+\par
+Here the variable, days, was created, assigned the list as a value, and stored in the session.\par
+\par
+A map is a list of assignments, the value is assigned to the key using the equal character ( = ) . For example:\par
+\par
+For example:\par
+\par
+g! sounds = [ dog=bark cat=meow lion=roar ]\par
+dog                bark\par
+cat                meow\par
+lion               roar \par
+\par
+Here, the variable sounds is assigned a map with the preceding key value pairs.\par
+\par
+Object properties and operations\par
+\par
+The shell uses a mapping process that involves reflection to find the best operation to perform for a request. We're not going to go into the details of how this happens; instead, we'll give a few examples of the operations that can be performed. We'll see a few others as we go along.\par
+\par
+In the same session, days and sounds are defined previously to retrieve an entry in the $days list:\par
+\par
+g! $days get 1\par
+tue\par
+\par
+To retrieve an entry in the sounds map\par
+\par
+g! $sounds get dog\par
+bark\par
+\par
+An example we've seen earlier is the bundles command used when illustrating the piping. Bundles was mapped to the method getBundles() from the Gogo Runtime bundle BundleContext instance. Another property of this object that we'll use in the next section is bundle &ltid> to get a bundle object instance using getBundle(long).\par
+\par
+Execution quotes\par
+\par
+Similar to the UNIX back-quote syntax, but providing one that's simpler for a lightweight parser, the execution quotes are used to return the output of an executed program.\par
+\par
+For example:\par
+\par
+g!(bundle 1) location\par
+{\field{\*\fldinst{HYPERLINK "file:/C:/felix/bundle/org.apache.felix.bundlerepository-1.6.2.jar"}}{\fldrslt{\ul\cf1 file:/C:/felix/bundle/org.apache.felix.bundlerepository-1.6.2.jar}}}\f0\fs22\par
+\par
+Here, (bundle 1) has returned the bundle with ID 1, which we've re-used to retrieve the property location making use of Gogo's reflexion on beans (location is mapped to getLocation() on the Bundle object ).\par
+\par
+Commands and scopes\par
+\par
+The Gogo Runti me command processor is extensible and allows any bundle to register the commands it needs to expose to the user. Then, when the user types a command, the processor will attempt to find the method that's best fit to be executed, based on the command name and passed arguments.\par
+\par
+However, there are potential cases where two bundles would need to register the same command name. To avoid this clash, commands are registered with an opti onal scope. When there is no ambiguity as to which scope the command belongs to, the command can be used without a scope; otherwise, the scope must be included.\par
+\par
+The scope of a command is specified by pre-pending it to the command, separated from the command with a colon ( : ). In the previous examples, we've used the grep command, which is in the gogo scope. In this case, grep and gogo:grep achieve the same result.\par
+\par
+We will look closer at the command registration mechanism.\par
+\par
+Let's take a tour of some of the commands available in the Felix distribution.\par
+\par
+At the time of writing of this article, the Gogo bundles are at version 0.6.0, which means that they are not yet finalized and may change by the time they are released with version 1.0.\par
+\par
+felix scope commands\par
+\par
+One of the many powerful features of Felix (and OSGi-compliant applications in general) is that many actions can be applied on bundles without needing to restart the framework. Bundles can be installed, updated, uninstalled, and so on while the remaining functionality of the framework is active.\par
+\par
+The following are some of the available commands and a description of their usage. We will get to use many of those as we go along, so you need not worry much about learning them by heart. Just know they exist.\par
+\par
+Listing installed bundles: lb\par
+\par
+One of the most frequently used shell commands is the list bundles command (lb) , which gives a listing of the currently installed bundles, showing some informationon each of them.\par
+\par
+Let's check what's running on our newly installed framework:\par
+\par
+g! lb\par
+START LEVEL 1\par
+  ID|State    |Level|Name\par
+   0|Active   | 0|System Bundle (3.0.1)\par
+   1|Active   | 1|Apache Felix Bundle Repository (1.6.2)\par
+   2|Active   | 1|Apache Felix Gogo Command (0.6.0)\par
+   3|Active   | 1|Apache Felix Gogo Runtime (0.6.0)\par
+   4|Active   | 1|Apache Felix Gogo Shell (0.6.0)\par
+\par
+The listing provides the following useful information about each bundle:\par
+\par
+Each bundle is given a unique id on install\lang2052\f1\emdash this ID is used by commands such as update or uninstall to apply acti ons on that bundle\par
+The bundle's start level\par
+The bundle's name and version\par
+This command also takes a parameter for filtering the bundles list. For example, to include only bundles that have 'bundle' in their name:\par
+\par
+g! lb bundle\par
+START LEVEL 1\par
+  ID|State    |Level|Name\par
+   0|Active   | 0|System Bundle (3.0.1)\par
+   1|Active   | 1|Apache Felix Bundle Repository (1.6.2)\par
+\par
+help\par
+The help command provides hints on the usage of commands.\par
+\par
+When called without any parameters, the help command gives a listing of the available commands:\par
+\par
+g! help\par
+felix:bundlelevel\par
+felix:cd\par
+felix:frameworklevel\par
+felix:headers\par
+felix:help\par
+felix:inspect\par
+felix:install\par
+felix:lb\par
+felix:log\par
+felix:ls\par
+felix:refresh\par
+felix:resolve\par
+felix:start\par
+felix:stop\par
+felix:uninstall\par
+felix:update\par
+felix:which\par
+gogo:cat\par
+gogo:each\par
+gogo:echo\par
+gogo:format\par
+gogo:getopt\par
+gogo:gosh\par
+gogo:grep\par
+gogo:not\par
+gogo:set\par
+gogo:sh\par
+gogo:source\par
+gogo:tac\par
+gogo:telnetd\par
+gogo:type\par
+gogo:until\par
+obr:deploy\par
+obr:info\par
+obr:javadoc\par
+obr:list\par
+obr:repos\par
+obr:source\par
+\par
+More help on the syntax of each command can be requested by typing help &ltcommand-name>.\par
+\par
+For example, for more help on the repos command:\par
+\par
+g! help repos\par
+\par
+\par
+repos - manage repositories\par
+   scope: obr\par
+   parameters:\par
+      String ( add | list | refresh | remove )\par
+      String[] space-delimited list of repository URL\par
+\par
+When the command is available with multiple signatures, a help block per signature is provided, for example:\par
+\par
+g! help help\par
+\par
+\par
+help - displays information about a specific command\par
+   scope: felix\par
+   parameters:\par
+      String target command\par
+\par
+help - displays available commands\par
+   scope: felix\par
+\par
+Here, the help command has 2 syntaxes: one that takes a parameter (the target command), and another that takes no parameters. We've used the first one to get help on help.\par
+\par
+Some commands may have not registered help content with the shell service. Those will show minimal information using help &ltcommand>. In most cases, they expose a separate help listing\emdash usually &ltcommand> -? or &ltcommand> -- help.\par
+\par
+install\par
+The install command is used to instruct Felix to install an external bundle. The syntax is as follows:\par
+\par
+g! help install\par
+\par
+\par
+install - install bundle using URLs\par
+   scope: felix\par
+   parameters:\par
+      String[] target URLs\par
+\par
+Each bundle is located using the URL and is downloaded to the local cache for installation.\par
+\par
+Once a bundle is installed, it is given a unique id. This ID is used to refer to this bundle when using commands such as update or uninstall. For example:\par
+\par
+g! install {\field{\*\fldinst{HYPERLINK "http://www.mysite.com/testbundle-1.0.0.jar"}}{\fldrslt{\ul\cf1 http://www.mysite.com/testbundle-1.0.0.jar}}}\f1\fs22\par
+Bundle ID: 7\par
+\par
+Here, the bundle I've just installed has the ID 7.\par
+\par
+g! lb\par
+START LEVEL 1\par
+   ID|State     |Level|Name\par
+    0|Active    | 0|System Bundle (3.0.1)\par
+    1|Active    | 1|Apache Felix Bundle Repository (1.6.2)\par
+    2|Active    | 1|Apache Felix Gogo Command (0.6.0)\par
+    3|Active    | 1|Apache Felix Gogo Runtime (0.6.0)\par
+    4|Active    | 1|Apache Felix Gogo Shell (0.6.0)\par
+    7|Installed | 1|Test Bundle (1.0.0)\par
+\par
+In cases where many bundles are to be installed from the same base URL, you may want to set a session variable with the common base URL to simplify the task.\par
+\par
+For example, instead of executing:\par
+\par
+g! install {\field{\*\fldinst{HYPERLINK "http://site.com/bundle1.jar"}}{\fldrslt{\ul\cf1 http://site.com/bundle1.jar}}}\f1\fs22  {\field{\*\fldinst{HYPERLINK "http://site.com/bundle2.jar"}}{\fldrslt{\ul\cf1 http://site.com/bundle2.jar}}}\f1\fs22\par
+\par
+You would write:\par
+\par
+g! b = {\field{\*\fldinst{HYPERLINK "http://site.com"}}{\fldrslt{\ul\cf1 http://site.com}}}\f1\fs22\par
+g! install $b/bundle1.jar $b/bundle2.jar\par
+\par
+        Read more about this book\tab      Add to cart\par
+(For more resources on this subject, see here.)\par
+\par
+update\par
+As newer versions of bundles are released, it is easy to update the installed bundle with a newer version by using the update command.\par
+\par
+The update command takes a bundle ID and an optional source URL as parameters. Its syntax is:\par
+\par
+g! help update\par
+\par
+\par
+update - update bundle\par
+   scope: felix\par
+   parameters:\par
+      Bundle  target bundle\par
+\par
+update - update bundle from URL\par
+   scope: felix\par
+   parameters:\par
+      Bundle  target bundle\par
+      String  URL from where to retrieve bundle\par
+\par
+For example:\par
+\par
+g! update 7 {\field{\*\fldinst{HYPERLINK "http://www.mysite.com/testbundle-1.0.1.jar"}}{\fldrslt{\ul\cf1 http://www.mysite.com/testbundle-1.0.1.jar}}}\f1\fs22\par
+g!\par
+g! lb\par
+START LEVEL 1\par
+  ID|State     |Level|Name\par
+   0|Active    | 0|System Bundle (3.0.1)\par
+   1|Active    | 1|Apache Felix Bundle Repository (1.6.2)\par
+   2|Active    | 1|Apache Felix Gogo Command (0.6.0)\par
+   3|Active    | 1|Apache Felix Gogo Runtime (0.6.0)\par
+   4|Active    | 1|Apache Felix Gogo Shell (0.6.0)\par
+   7|Installed | 1|Test Bundle (1.0.1)\par
+\par
+Notice that the bundle ID remains unchanged.\par
+\par
+When a source URL is not provided, the bundle is updated from the same location it was installed from.\par
+\par
+resolve\par
+The resolve command requests that the framework undergo the resolution process for the given bundle.\par
+\par
+The syntax of this command is as follows:\par
+\par
+g! help resolve\par
+\par
+\par
+resolve - resolve bundles\par
+   scope: felix\par
+   parameters:\par
+      Bundle[]  target bundles (can be null or empty)\par
+\par
+If no parameter is provided, then the framework will resolve all unresolved bundles. To resolve specific bundles, the list ids of the bundles to be resolved are passed as parameters.\par
+\par
+stop and start\par
+The stop and start commands take a space-separated sequence of bundle IDs to stop or to start.\par
+\par
+The stop command syntax is as follows:\par
+\par
+g! help stop\par
+\par
+\par
+stop - stop bundles\par
+   scope: felix\par
+   flags:\par
+     -t, --transient stop bundle transiently\par
+   parameters:\par
+      Bundle[]  target bundles\par
+\par
+Use the -t (or --transient) flag to stop the bundle in transient mode, that is, not saving its state to the persisted auto-start state. The framework will not remember this bundle as having been stopped the next time it is restarted.\par
+\par
+The start command syntax is similar to the stop command:\par
+\par
+g! help start\par
+\par
+\par
+start - start bundles\par
+   scope: felix\par
+flags:\par
+  -p, --policy use declared activation policy\par
+  -t, --transient start bundle transiently\par
+parameters:\par
+   String[] target bundle identifiers or URLs\par
+\par
+It uses the -t flag in the same way as the stop command\par
+\par
+Use the -p (of --policy) flag to use the activation policy declared in the Bundle-ActivationPolicy header.\par
+\par
+To exit the framework, use stop 0 which stops the System Bundle, thus launching the stop process for the other bundles before shutting down.\par
+\par
+uninstall\par
+The uninstall command is used to remove one or more bundles from the framework. The bundles are first stopped and then uninstalled.\par
+\par
+The usage of this command is as follows:\par
+\par
+g! help uninstall\par
+\par
+\par
+uninstall - uninstall bundles\par
+   scope: felix\par
+   parameters:\par
+      Bundle[]  target bundles\par
+\par
+The list of IDs of bundles to be uninstalled is passed as a parameter.\par
+\par
+refresh\par
+The refresh command forces the update of the packages exported by the refreshed bundles. The refresh is performed to the provided bundles and the bundles that depend on them. It is typically used aft er an update or aft er an uninstall of a bundle, to update the packages exported by an updated bundle and to completely remove those of an uninstalled one.\par
+\par
+The syntax of the refresh command is as follows:\par
+\par
+refresh - refresh bundles\par
+   scope: felix\par
+   parameters:\par
+      Bundle[]  target bundles (can be null or empty)\par
+\par
+The syntax of the refresh command is as follows:\par
+\par
+To refresh specific bundles, the ids of those bundles are passed as parameters. Otherwise, calling refresh with no parameters refreshes all bundles that were updated or uninstalled.\par
+\par
+headers and inspect\par
+\par
+The headers and inspect commands provide valuable information on how a bundle is perceived by the framework. The headers command lists the bundle headers in the main section of the bundle's manifest. Its usage is as follows:\par
+\par
+g! help headers\par
+\par
+\par
+headers - display bundle headers\par
+   scope: felix\par
+   parameters:\par
+      Bundle[]  target bundles\par
+\par
+For example, to display the headers of the bundle Apache Felix Bundle Repository, use:\par
+\par
+g! headers 1\par
+\par
+\par
+Apache Felix Bundle Repository (1)\par
+\par
+----------------------------------\par
+\par
+Bnd-LastModified = 1272565441581\par
+\par
+Build-Jdk = 1.6.0_17\par
+\par
+Built-By = gnodet\par
+\par
+Bundle-Activator = org.apache.felix.bundlerepository.impl.Activator\par
+\par
+Bundle-Description = Bundle repository service.\par
+\par
+Bundle-DocURL = {\field{\*\fldinst{HYPERLINK "http://felix.apache.org/site/apache-felix-osgi"}}{\fldrslt{\ul\cf1 http://felix.apache.org/site/apache-felix-osgi}}}\f1\fs22 -\par
+\par
+bundle-repository.html\par
+\par
+Bundle-License = {\field{\*\fldinst{HYPERLINK "http://www.apache.org/licenses/LICENSE-2.0.txt"}}{\fldrslt{\ul\cf1 http://www.apache.org/licenses/LICENSE-2.0.txt}}}\f1\fs22\par
+\par
+Bundle-ManifestVersion = 2\par
+\par
+Bundle-Name = Apache Felix Bundle Repository\par
+\par
+Bundle-Source = {\field{\*\fldinst{HYPERLINK "http://felix.apache.org/site/downloads.cgi"}}{\fldrslt{\ul\cf1 http://felix.apache.org/site/downloads.cgi}}}\f1\fs22\par
+\par
+Bundle-SymbolicName = org.apache.felix.bundlerepository\par
+\par
+Bundle-Url = {\field{\*\fldinst{HYPERLINK "http://felix.apache.org/site/downloads.cgi"}}{\fldrslt{\ul\cf1 http://felix.apache.org/site/downloads.cgi}}}\f1\fs22\par
+\par
+Bundle-Vendor = The Apache Software Foundation\par
+\par
+Bundle-Version = 1.6.2\par
+\par
+Created-By = Apache Maven Bundle Plugin\par
+\par
+...\par
+\par
+The inspect command displays various information on a bundle's dependencies, requirements, packages it exports, and so on. Its usage is as follows:\par
+\par
+g! help inspect\par
+\par
+\par
+inspect - inspects bundle dependency information\par
+   scope: felix\par
+   parameters:\par
+      String  (package | bundle | fragment | service)\par
+      String  (capability | requirement)\par
+      Bundle[]  target bundles\par
+\par
+The first parameter is the inspection type:\par
+\par
+package to inspect package-related information, for example, which packages the specified bundles import from or export to other bundles\par
+bundle to inspect the requirements or capabilities of the given bundles\par
+fragment to inspect fragment-related information, such as a fragment's host or the list of hosted fragments\par
+service to inspect the bundles service related information, such as the list of imported or exported services\par
+The second parameter is the direction of the inspection, with respect to the bundle:\par
+\par
+capability to inspect what the specified bundles can give to the platform\par
+requirement to inspect what the specified bundles need from the platform\par
+The remaining parameters are one or more bundles to be inspected.\par
+\par
+For example, the package capability of the bundle Apache Felix Bundle Repository are as follows:\par
+\par
+g! inspect package capability 1\par
+org.apache.felix.bundlerepository [1] exports packages:\par
+-------------------------------------------------------\par
+org.apache.felix.bundlerepository; version=2.0.0 imported by:\par
+   org.apache.felix.gogo.command [2]\par
+\par
+This says that the bundle exports a package (org.apache.felix.bundlerepository), which is imported by bundle 2, Apache Felix Gogo Command.\par
+\par
+Inspect also accepts shorthand first letters for the inspection type and direction. For example, the command inspect p c 1 can be used instead of the longer one seen previously.\par
+\par
+which\par
+The which command will provide information on where a given bundle loads a given class. This command is useful when investigating problems related to conflicts between classes or issues with their visibility.\par
+\par
+Its syntax is as follows:\par
+\par
+g! help which\par
+\par
+\par
+which - determines from where a bundle loads a class\par
+   scope: felix\par
+   parameters:\par
+      Bundle  target bundle\par
+      String  target class name\par
+\par
+The first parameter is the bundle to use as the context for the class loading and the second is the name of the class to load.\par
+\par
+For example, to know where the bundle Apache Felix Gogo Command loads its org.apache.felix.bundlerepository.Repository class, use:\par
+\par
+g! which 2 org.apache.felix.bundlerepository.Repository\par
+Loaded from: org.apache.felix.bundlerepository [1]\par
+\par
+The answer is bundle 1: Apache Felix Bundle Repository. The result shows the bundle symbolic name and the bundle ID.\par
+\par
+log\par
+The log command allows us to peek into the list of the last few log entries. Its usage is as follows:\par
+\par
+g! help log\par
+\par
+\par
+log - display some matching log entries\par
+   scope: felix\par
+   parameters:\par
+      int   maximum number of entries\par
+      String   minimum log level [ debug | info | warn | error ]\par
+\par
+log - display all matching log entries\par
+   scope: felix\par
+   parameters:\par
+      String   minimum log level [ debug | info | warn | error ]\par
+\par
+The default Felix distribution doesn't come with a log service installed, so running this command at this point will issue a warning:\par
+\par
+g! log debug\par
+Log reader service is unavailable.\par
+\par
+cd and ls\par
+Some of the commands that are available through this console may read from or write to files. For example, the grep command can read a file and display the lines that match a given pattern. It will read the file relative to the shell session working directory. We will look at this and other file manipulating commands in a shortwhile.\par
+\par
+The cd and ls commands are very similar to their Unix counterparts.\par
+\par
+The cd command is used to display or change the current shell working directory. Its usage is as follows:\par
+\par
+g! help cd\par
+\par
+\par
+cd - change current directory\par
+   scope: felix\par
+   parameters:\par
+      CommandSession  automatically supplied shell session\par
+      String   target directory\par
+\par
+cd - get current directory\par
+   scope: felix\par
+   parameters:\par
+      CommandSession  automatically supplied shell session\par
+\par
+When called without parameters, it will display the current working directory. To change the current directory, pass the target directory as a parameter.\par
+\par
+The ls command is used to list the contents of a directory. Its syntax is as follows:\par
+\par
+g! help ls\par
+\par
+\par
+ls - get specified path contents\par
+   scope: felix\par
+   parameters:\par
+      CommandSession  automatically supplied shell session\par
+      String  path with optionally wild carded file name\par
+          \par
+ls - get current directory contents\par
+   scope: felix\par
+   parameters:\par
+      CommandSession  automatically supplied shell session\par
+\par
+The path of the directory to be listed is passed as a parameter. If no parameters are passed, then the contents of the current working directory are shown.\par
+\par
+For example, the contents of the current directory are as follows:\par
+\par
+g! ls\par
+C:\\felix\\bin\par
+C:\\felix\\bundle\par
+C:\\felix\\conf\par
+C:\\felix\\DEPENDENCIES\par
+C:\\felix\\doc\par
+C:\\felix\\felix-cache\par
+C:\\felix\\LICENSE\par
+C:\\felix\\LICENSE.kxml2\par
+C:\\felix\\NOTICE\par
+C:\\felix\\run.bat\par
+\par
+Changing to a sub-directory:\par
+\par
+g! cd bundle\par
+Name             bundle\par
+CanonicalPath    C:\\felix\\bundle\par
+Parent           C:\\felix\par
+Path             C:\\felix\\bundle\par
+AbsoluteFile     C:\\felix\\bundle\par
+AbsolutePath     C:\\felix\\bundle\par
+CanonicalFile    C:\\felix\\bundle\par
+ParentFile       C:\\felix\par
+\par
+        Read more about this book\tab      Add to cart\par
+(For more resources on this subject, see here.)\par
+\par
+frameworklevel and bundlelevel\par
+\par
+The frameworklevel and bundlelevel commands allow us to modify start levels.\par
+\par
+The frameworklevel command is used to get or set the framework's active start level. Its syntax is as follows:\par
+\par
+g! help frameworklevel\par
+\par
+\par
+frameworklevel - query framework active start level\par
+   scope: felix\par
+frameworklevel - set framework active start level\par
+   scope: felix\par
+   parameters:\par
+      int  target start level\par
+\par
+To get the active start level of the framework, use the command without any parameters:\par
+\par
+g! frameworklevel\par
+Level is 1\par
+\par
+To change it, pass the target start level as a parameter.\par
+\par
+The bundle level displays and manipulates the bundle's start levels. Its syntax is:\par
+\par
+g! help bundlelevel\par
+\par
+\par
+bundlelevel - set bundle start level or initial bundle start level\par
+   scope: felix\par
+   flags:\par
+     -i, --setinitial  set the initial bundle start level\par
+     -s, --setlevel   set the bundle's start level\par
+   parameters:\par
+      int  target level\par
+      Bundle[]  target identifiers\par
+\par
+bundlelevel - query bundle start level\par
+   scope: felix\par
+   parameters:\par
+      Bundle  bundle to query\par
+\par
+To query the start level of a bundle, use the command with one parameter\emdash the bundle ID:\par
+\par
+g! bundlelevel 2\par
+org.apache.felix.gogo.command [2] is level 1\par
+\par
+To change the framework's initial bundle start level, use the command with the option -i set:\par
+\par
+g! bundlelevel -i 2\par
+\par
+This has set the initial bundle start level to 2 for newly installed bundles.\par
+\par
+To change the start level of one or more bundles, use the -s option followed by the target start level and the list of bundles to modify.\par
+\par
+ \par
+\par
+gogo scope commands\par
+\par
+The commands in the gogo scope provide a few additional tools that are especially useful when scripting a recurrent set of operations. We will cover some of them here.\par
+\par
+echo\par
+The echo command will evaluate its arguments and display the result on the console. For example:\par
+\par
+g! var1 = 'this is'\par
+this is\par
+g! var2 = ' a string'\par
+ a string\par
+g! echo $var1$var2\par
+this is a string\par
+\par
+grep\par
+The grep command is used to search the input for lines that match a given pattern; it is very similar to the Unix grep tool. The input is either standard input, the output of a command piped to grep, or the contents of files.\par
+\par
+The grep command will return false if there were no lines in the input that match the pattern. It will return true otherwise.\par
+\par
+Its usage is as follows:\par
+\par
+g! grep -?\par
+grep -  search for PATTERN in each FILE or standard input.\par
+Usage: grep [OPTIONS] PATTERN [FILES]\par
+  -? --help                show help\par
+  -i --ignore-case         ignore case distinctions\par
+  -n --line-number         prefix each line with line number within its \par
+input file\par
+  -q --quiet, --silent     suppress all normal output\par
+  -v --invert-match        select non-matching lines\par
+true\par
+\par
+The PATTERN argument is an encoded regular expression (regex) that defines the sequence of characters that are considered a match. It follows the regex pattern format, defined for the Java java.util.regex.Pattern class.\par
+You can visit the following for more information on regex:\par
+{\field{\*\fldinst{HYPERLINK "http://download-llnw.oracle.com/javase/1.5.0/docs/api/java/util/regex/Pattern.html"}}{\fldrslt{\ul\cf1 http://download-llnw.oracle.com/javase/1.5.0/docs/api/java/util/regex/Pattern.html}}}\f1\fs22\par
+\par
+For example, to grep the output of the lb command for lines containing the string Apache:\par
+\par
+g! lb | grep Apache\par
+    1|Active     |   1|Apache Felix Bundle Repository (1.6.2)\par
+    2|Active     |   1|Apache Felix Gogo Command (0.6.0)\par
+    3|Active     |   1|Apache Felix Gogo Runtime (0.6.0)  \par
+    4|Active     |   1|Apache Felix Gogo Shell (0.6.0)\par
+true\par
+\par
+The -i (short for --ignore-case) option makes the pattern not case sensitive, thus matching both the lowercase and uppercase for a letter.\par
+\par
+The -n (or --line-number) option requests that the command include the line number when printing the results. For example:\par
+\par
+g! lb | grep -n Apache\par
+4:    1|Active         |   1|Apache Felix Bundle Repository (1.6.2)\par
+5:    2|Active         |   1|Apache Felix Gogo Command (0.6.0)\par
+6:    3|Active         |   1|Apache Felix Gogo Runtime (0.6.0)\par
+7:    4|Active         |   1|Apache Felix Gogo Shell (0.6.0)\par
+true\par
+\par
+The -q option (also --quiet or --silent) is used to suppress the grep command output. The command will only return true or false after it is finished with the input. This is especially useful when using the command for its returned value only (as a loop guard, for example).\par
+\par
+The -v (or --invert-match) is used to show the lines that don't match the pattern (inverse match). For example:\par
+\par
+g! lb | grep -v Apache\par
+START LEVEL 1\par
+   ID|State      |Level|Name\par
+    0|Active     | 0|System Bundle (3.0.1)\par
+true\par
+\par
+cat\par
+The cat command is used to concatenate files and display their contents on the console. It takes one or more filenames relative to the current shell session directory (see cd and ls in the previous section) and displays them.\par
+\par
+For example, to display the run.bat file we had created at the beginning of this article, use the following:\par
+\par
+g! cat run.bat\par
+java -jar bin/felix.jar\par
+\par
+Separate the arguments with whitespace to display more than one file sequentially.\par
+\par
+tac\par
+The tac command, in a way, is the opposite of the cat command. Here it takes the text from the standard input and either returns it as a string or as a list for use as input for another command or writes it to a file.\par
+\par
+The syntax is as shown here:\par
+\par
+g! tac -?\par
+tac - capture stdin as String or List and optionally write to file.\par
+Usage: tac [-al] [FILE]\par
+  -a --append             append to FILE\par
+-l --list                 return List<String>\par
+-? --help                 show help\par
+\par
+The following example makes a list of the input and then gets the second item in the resulting list.\par
+\par
+g! var1 = tac -l ; $var1 get 1\par
+a1\par
+a2\par
+a3\par
+^Z\par
+a2\par
+\par
+Notice the use of Ctrl-Z (shows as ^Z on the console display) to terminate user input.\par
+\par
+Passing a filename as an argument will create the file and write the input text to it. The -a or --append option can be used to append to an existing file. For example, this will create a file from the standard input and display its contents using the cat command:\par
+\par
+g! tac test.out ; cat test.out\par
+this is a test, line 1\par
+last line\par
+^Z\par
+this is a test, line 1\par
+last line\par
+\par
+The input of the tac command can also be the piped output of another. For example, the next command will make a backup copy of our test.out file created previously:\par
+\par
+g! cat test.out | tac test.out.bak\par
+this is a test, line 1 last line\par
+g!\par
+g! cat test.out.bak\par
+this is a test, line 1\par
+last line\par
+\par
+set\par
+The set command is used to inspect session variable information, as well as turn session tracing on or off.\par
+\par
+Help on the usage of the set command can be retrieved as follows:\par
+\par
+g! set -?\par
+set - show session variables\par
+Usage: set [OPTIONS] [PREFIX]\par
+  -? --help          show help \par
+  -a --all           show all variables, including those starting with .\par
+  -x                 set xtrace option\par
+  +x                 unset xtrace option\par
+If PREFIX given, then only show variable(s) starting with PREFIX\par
+\par
+The -x option is used to turn execution traces on. For example, taking one of the samples used previously, without setting the xtrace option:\par
+\par
+g! var = 'this is a string'\par
+this is a string\par
+g! echo $var\par
+this is a string\par
+\par
+When setting the xtrace option, the shell will output a trace message for each command it will execute and for each result of that command. In this case:\par
+\par
+g! set -x\par
+g!\par
+g! var = 'this is a string'\par
++ var '=' 'this is a string'\par
+this is a string\par
+g! echo $var\par
++ echo $var\par
+this is a string \par
+\par
+Setting shell execution traces on is especially useful when working on a script (see the previous source).\par
+\par
+Use set +x to turn traces off.\par
+\par
+Summary\par
+In this article, you have learned about the Gogo command-line language and some of its commands. By now, you should:\par
+\par
+Understand the Gogo command syntax\par
+Know about most of the commands available in the Gogo shell\par
+Know how to get help on the usage of commands\par
+Further resources on this subject:\par
+\par
+Configuring Apache and Nginx\par
+Apache OFBiz Services\par
+Apache Geronimo Logging\par
+Using the OSGi Bundle Repository in OSGi and Apache Felix 3.0\par
+Getting Started with Bookshelf Project in Apache Felix\lang9\f0\par
+}
+ 

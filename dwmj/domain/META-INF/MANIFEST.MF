@@ -1,0 +1,18 @@
+Manifest-Version: 1.0
+Bundle-Description: Generated using Pax-Construct
+Bundle-SymbolicName: com.dudewheresmyjar.domain
+Built-By: Administrator
+Bundle-ManifestVersion: 2
+Bnd-LastModified: 1440270084432
+Import-Package: dwmj.domain;version="1.0.0.SNAPSHOTs",org.osgi.framewo
+ rk
+Tool: Bnd-0.0.255
+Export-Package: dwmj.domain;version="1.0.0.SNAPSHOTs"
+Bundle-Version: 1.0.0.SNAPSHOTs
+Bundle-Name: com.dudewheresmyjar.domain [dwmj.domain]
+Private-Package: dwmj.domain.internal
+Ignore-Package: dwmj.domain.internal
+Bundle-Activator: dwmj.domain.internal.ExampleActivator
+Created-By: Apache Maven Bundle Plugin
+Build-Jdk: 1.8.0_05
+
