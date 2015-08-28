@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:p="http://www.springframework.org/schema/p"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans 
+     http://www.springframework.org/schema/beans/spring-beans-3.0.xsd">
+
+	<bean id="greetingBefore" class="aop.advice.GreetingBeforeAdvice" />
+	<bean id="greetingAfter" class="aop.advice.GreetingAfterAdvice" />
+	<bean id="greetingAround" class="aop.advice.GreetingInterceptor" />
+	<bean id="waiterTarget" class="aop.advice.NaiveWaiter" />
+
+
+	<!-- AOP dynamic-proxy bean: MethodInterceptors and Advisors
+		 are identified by a list of bean names in the current
+		 bean factory, specified through the "interceptorNames" property -->
+	<!-- before and after advice -->
+	<bean id="waiterProxy" class="org.springframework.aop.framework.ProxyFactoryBean"
+		p:proxyInterfaces="aop.advice.Waiter"   
+		p:target-ref="waiterTarget"				
+		p:interceptorNames="greetingBefore,greetingAfter" />
+	<!-- or specify interceptorNames as following
+		<property name="interceptorNames">
+			<list>
+				<idref local="greetingBefore"/>
+				<idref local="greetingAfter"/>
+			</list>
+		</property> 
+	 -->
+
+    <!-- around advice -->
+	<!--
+		bean id="waiter" class="org.springframework.aop.framework.ProxyFactoryBean"
+		p:proxyInterfaces="aop.advice.Waiter"
+		p:target-ref="waiterTarget"
+		p:interceptorNames="greetingAround" /
+	-->
+
+	<!--4. 异常抛出增强  -->
+	<bean id="forumServiceTarget" class="aop.advice.ForumService" />
+	<bean id="transactionManager" class="aop.advice.TransactionManager" />
+	<bean id="forumService" class="org.springframework.aop.framework.ProxyFactoryBean"
+		p:interceptorNames="transactionManager"
+		p:target-ref="forumServiceTarget"
+		p:proxyTargetClass="true"/>
+
+</beans>
